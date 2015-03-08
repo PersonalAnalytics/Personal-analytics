@@ -38,8 +38,8 @@ else:
 
 
 # Connect to S3
-AWS_ACCESS_KEY_ID = 'AKIAJ7BESVOEO2UKRRXQ'
-AWS_SECRET_ACCESS_KEY = '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'
+AWS_ACCESS_KEY_ID = XXXXXXXXXX
+AWS_SECRET_ACCESS_KEY = XXXXXXXXXX
 bucket_name = options.bucket_arn
 conn = boto.connect_s3(AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY)
 bucket = conn.create_bucket(bucket_name,location=boto.s3.connection.Location.DEFAULT)
