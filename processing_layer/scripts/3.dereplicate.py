@@ -11,14 +11,18 @@ def parse_args():
     parser.add_argument('-o', help='Output mapping file', required=True)
     parser.add_argument('-d', help='OTU database', default='', required=True)
     parser.add_argument('-M', help='Min count', default=10, type=int)
-    parser.add_argument('-S', help='Min samples', default=3, type=int)
+    parser.add_argument('-S', help='Min samples', default=1, type=int)
     parser.add_argument('-l', help='Trim length', type=int, default=0)
     args = parser.parse_args()
     return args
 
 
-def dereplicate(fst='', fsq='', sep='_', trim_len=''):
+def dereplicate(fst='', fsq='', sep='', trim_len=''):
     # Dereplicate sequences
+    # NOTE:
+    #      Separator for barcodes must be specified in summary file. 
+    #      e.g. 'SRR230982;142' the separator is ';'
+    #      
     x = {}
     if fst:
         fn = fst
@@ -26,10 +30,13 @@ def dereplicate(fst='', fsq='', sep='_', trim_len=''):
     if fsq:
         fn = fsq
         iter_fst = util.iter_fsq
+    counter = 0
     for record in iter_fst(fn):
+        counter += 1
         [sid, seq] = record[:2]
         sid = sid[1:]
-        sa = re.search('(.*?)%s' %(sep), sid).group(1)
+        #sa = re.search('(.*?)%s' %(sep), sid).group(1)
+        sa = sid.split(sep)[0]
         if trim_len:
             if len(seq) >= trim_len:
                 seq = seq[:trim_len]
@@ -37,15 +44,21 @@ def dereplicate(fst='', fsq='', sep='_', trim_len=''):
                 continue
         if seq not in x:
             x[seq] = {}
+#        if sid not in x[seq]:
+#            x[seq][sid] = 0
+#        x[seq][sid] += 1
         if sa not in x[seq]:
             x[seq][sa] = 0
         x[seq][sa] += 1
+    for seq in x:
+        print len(x[seq])
     return x
 
 
 def write_output(x, map_fn, db_fn, min_size=1, min_samples=1):
     # Write output (database + mapping file)
     # Load SeqDB
+    min_samples = 1
     db = seqdb.SeqDB(fn=db_fn)
     out = open(map_fn, 'w')
     for seq in x:
@@ -58,7 +71,6 @@ def write_output(x, map_fn, db_fn, min_size=1, min_samples=1):
         out.write('%s\t%s\n' %(db.db[:seq], ' '.join(['%s:%d' %(sa, x[seq][sa]) for sa in x[seq]])))
     out.close()
     db.write(db_fn)
-
 
 args = parse_args()
 if args.l == 0:

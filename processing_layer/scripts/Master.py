@@ -1,0 +1,75 @@
+"""
+
+OVERVIEW: 
+
+Master Script that checks a given dataset directory for any processing requests.
+
+Currently only 16S processing supported.
+
+"""
+
+import numpy as np
+import os
+import os.path
+import sys
+from optparse import OptionParser
+from SummaryParser import *
+
+# Read in arguments
+usage = "%prog -i DATASET_DIR"
+parser = OptionParser(usage)
+parser.add_option("-i", "--datadir", type="string", dest="datadir")
+(options, args) = parser.parse_args()
+
+if( not options.datadir ):
+    parser.error("No directory specified for the data.")
+
+
+# Pipe stdout and stderr to logfiles in the new directory
+working_directory = options.datadir
+sys.stdout = open(working_directory + '/stdout_master.log','w')
+sys.stderr = open(working_directory + '/stderr_master.log','w')
+
+# Parse summary file
+summary_filename = options.datadir + '/' + 'summary_file.txt'
+summary_obj = SummaryParser(summary_filename)
+summary_obj.ReadSummaryFile()
+
+# Check if 16S processing is required, and if so, do it.
+if(summary_obj.attribute_value_16S['PROCESSED'] == 'True'):
+    print "[[ 16S processing ]] Processing already complete."
+elif(summary_obj.attribute_value_16S['PROCESSED'] == 'False'):
+    flags = ''
+    # Check if primers have been removed
+    if summary_obj.attribute_value_16S['PRIMERS_FILE'] == 'None':
+        flags = flags + ' -p True'
+        print "[[ 16S processing ]] No primers file.  Assuming primers have been trimmed."
+    if summary_obj.attribute_value_16S['BARCODES_MAP'] == 'None':
+        flags = flags + ' -b True'
+        print "[[ 16S processing ]] No barcodes map.  Assuming sequences have been split by barcode."
+    print "[[ 16S processing ]] Processing required.  Generating OTU tables."
+    raw2otu_cmd = 'python ~/scripts/raw2otu.py -i ' + working_directory + flags 
+    os.system(raw2otu_cmd)
+
+    # Check summary file again
+    summary_obj.ReadSummaryFile()
+    if(summary_obj.attribute_value_16S['PROCESSED'] == 'False'):
+        print "[[ 16S processing ]] ERROR: Failed to process 16S data"
+        raise NameError('ERROR: Failed to process 16S data.')    
+    elif(summary_obj.attribute_value_16S['PROCESSED'] == 'True'):
+        # Copy the processing results to the data directory
+        print "[[ 16S processing ]] Copying processing results to folder ./proc_16S ..."
+        processed_dir = working_directory + '/proc_16S'
+        os.system('mkdir ' + processed_dir)        
+        OTU_table_file = summary_obj.attribute_value_16S['OTU_TABLE']
+        OTU_sequences_fasta = summary_obj.attribute_value_16S['OTU_SEQUENCES_FASTA']
+        OTU_sequences_table = summary_obj.attribute_value_16S['OTU_SEQUENCES_TABLE']
+        os.system('cp ' + OTU_table_file + ' ' + processed_dir + '/.')
+        os.system('cp ' + OTU_sequences_fasta + ' ' + processed_dir + '/.')
+        os.system('cp ' + OTU_sequences_table + ' ' + processed_dir + '/.')
+        print "[[ 16S processing ]] Processing complete."
+    else:
+        print "[[ 16S processing ]] Unknown case.  Proceeding..."
+else:
+    print "[[ 16S processing ]] No processing request specified."
+    
