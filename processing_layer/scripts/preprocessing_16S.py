@@ -108,10 +108,10 @@ def split_by_barcodes(fastq_in, fastq_out, barcodes_map, mode):
     os.system('python ~/scripts/2.split_by_barcodes.py -q ' + fastq_in + ' -b ' + barcodes_map + ' -B tab -d 1 --mode ' + mode + ' -o ' + fastq_out)
     return None
 
-def dereplicate_and_sort(fastq_in, fasta_out, OTU_database, separator):
+def dereplicate_and_sort(fasta_in, fasta_out, OTU_database, separator):
     # Dereplicate and sort sequences by size
     print "[[ Dereplicating and sorting ]] ..."
-    os.system('sudo python ~/scripts/3.dereplicate.py -q ' + fastq_in + " -s '" + separator + "' -o " + OTU_database + ' -d ' + fasta_out)
+    os.system('sudo python ~/scripts/3.dereplicate.py -f ' + fasta_in + " -s '" + separator + "' -o " + OTU_database + ' -d ' + fasta_out)
     print "[[ Dereplicating and sorting ]] Complete."
     return None
 
@@ -127,11 +127,45 @@ def remove_chimeras_and_cluster_OTUs(fasta_in, OTU_sequences_fasta, OTU_sequence
     print "[[ Converting OTU sequence file to standard format ]] Complete."
     return None
 
-def build_OTU_table(fasta_in, fasta_out, dereplication_map):
-    # Builds an OTU table from a list of OTUs and a dereplication map
+def build_OTU_table(fasta_in, dereplication_map, OTU_table, OTU_GG_dict=0):
+    # Builds an OTU table from a list of OTUs and a dereplication map.  If an optional fourth argument is given, this should be a dictionary to convert OTU IDs to Greengenes ID.
     print "[[ Building OTU table ]] ..."
-    os.system('sudo python ~/scripts/4.derep2counts.py --fst ' + fasta_in + ' --map ' + dereplication_map + ' --out ' + fasta_out)
-    print "[[ Building OTU table ]] Complete."
-    return None
+    os.system('sudo python ~/scripts/4.derep2counts.py --fst ' + fasta_in + ' --map ' + dereplication_map + ' --out ' + OTU_table)
 
+    if OTU_GG_dict == 0:
+        print "[[ Building OTU table ]] Complete."
+        return None
+    else:
+        # Make a new dereplication map with non-GG-matching lines removed
+        new_dereplication_map = dereplication_map + '.gg'
+        new_OTU_table = OTU_table + '.gg'
+        with open(new_dereplication_map,'w') as newfid:
+            with open(dereplication_map,'r') as fid:
+                derepmap = fid.readlines()
+                new_derepmap = [line for line in derepmap if line.split()[0] in OTU_GG_dict]
+                for line in new_derepmap:
+                    linespl = line.split('\t')
+                    linespl[0] = OTU_GG_dict[linespl[0]]
+                    linejoined = '\t'.join(linespl)
+                    newfid.write(linejoined)
+        print "[[ Building OTU table ]] Building second (GreenGenes referenced) OTU table."
+        os.system('sudo python ~/scripts/4.derep2counts.py --map ' + new_dereplication_map + ' --out ' + new_OTU_table)
+        print "[[ Building OTU table ]] Greengenes OTU table complete."
+        print "[[ Building OTU table ]] Complete."
+        return None
 
+def parse_alignment(alignment_file):
+    # Parses an alignment of OTU sequences against a reference database.  Returns a dict of query indices (OTU IDs) and associated reference database IDs: {'OTU_ID': DB_ID}
+    with open(alignment_file, 'r') as fid:
+        all_lines = fid.readlines()
+        line_nums = [i for i in range(len(all_lines)) if all_lines[i][:6] == " Query"]
+        alignment_dict = {}
+        for line_num in line_nums:
+            line1 = all_lines[line_num]
+            line2 = all_lines[line_num + 1]
+            query = line1.split()[2]
+            query = query[1:]
+            target = line2.split()[2]
+            target = target[1:]
+            alignment_dict[query] = target
+    return alignment_dict

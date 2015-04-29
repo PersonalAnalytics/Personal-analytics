@@ -57,14 +57,11 @@ for line in open(args.map):
             x[i,j] += int(count)
 
 x = pd.DataFrame(x)
+
 sort_otus = sorted(otus.keys(), key=lambda a: otus[a])
-
-
 sort_samp = sorted(samples.keys(), key=lambda a: samples[a])
-keep = ((x > 0).sum(axis=0) > 10)
-keep2 = [i for i in range(len(sort_otus)) if x.ix[:,i].sum(axis=0) > 10]
+keep = ((x > 0).sum(axis=0) > args.min_samples)
 x = x.ix[:, keep]
-sort_otus = np.array(sort_otus)[keep2]
 
 out = open(args.out, 'w')
 out.write( 'sample\t' + '\t'.join(sort_otus) + '\n')

@@ -21,7 +21,7 @@ def dereplicate(fst='', fsq='', sep='', trim_len=''):
     # Dereplicate sequences
     # NOTE:
     #      Separator for barcodes must be specified in summary file. 
-    #      e.g. 'SRR230982;142' the separator is ';'
+    #      e.g. 'SRR230982_142' the separator is '_'
     #      
     x = {}
     if fst:
@@ -30,9 +30,9 @@ def dereplicate(fst='', fsq='', sep='', trim_len=''):
     if fsq:
         fn = fsq
         iter_fst = util.iter_fsq
+
     counter = 0
     for record in iter_fst(fn):
-        counter += 1
         [sid, seq] = record[:2]
         sid = sid[1:]
         #sa = re.search('(.*?)%s' %(sep), sid).group(1)
@@ -50,8 +50,7 @@ def dereplicate(fst='', fsq='', sep='', trim_len=''):
         if sa not in x[seq]:
             x[seq][sa] = 0
         x[seq][sa] += 1
-    for seq in x:
-        print len(x[seq])
+
     return x
 
 
@@ -69,6 +68,7 @@ def write_output(x, map_fn, db_fn, min_size=1, min_samples=1):
             continue
         db.add_seq(seq, size=size)
         out.write('%s\t%s\n' %(db.db[:seq], ' '.join(['%s:%d' %(sa, x[seq][sa]) for sa in x[seq]])))
+
     out.close()
     db.write(db_fn)
 

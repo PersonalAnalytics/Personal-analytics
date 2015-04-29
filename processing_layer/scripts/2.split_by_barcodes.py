@@ -115,7 +115,7 @@ def find_best_match(seq, b2s, w, max_diff):
 
 def run():
     # Maps FASTQ sequences to samples by finding the best matching barcodes
-    # Create new sequence ids of the form: sample;count
+    # Create new sequence ids of the form: sample_count, for compatibility with QIIME etc.
     
     # Initialize variables
     args = parse_args()
@@ -167,7 +167,7 @@ def run():
         # If sample found, replace seqid with new seqid
         if s:
             s2c[s] = s2c.get(s, 0) + 1 # Increment sample count
-            new_sid = '@%s;%d' %(s, s2c[s])
+            new_sid = '@%s_%d' %(s, s2c[s])
             record[0] = new_sid
             out.write('\n'.join(record) + '\n')
     out.close()

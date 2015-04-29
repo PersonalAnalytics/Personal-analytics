@@ -16,6 +16,7 @@ from SummaryParser import *
 import math
 from string import ascii_lowercase
 import multiprocessing as mp
+import Formatting as frmt
 
 # Read in arguments for the script
 
@@ -57,6 +58,7 @@ sys.stderr = open(working_directory + '/stderr_proc_16S.log','w')
 
 # Construct output filenames from dataset ID
 fastq_trimmed_qual = working_directory + '/' + dataset_ID + '.raw_trimmed_qual.fastq'
+fasta_trimmed = working_directory + '/' + dataset_ID + '.raw_trimmed.fasta'
 fastq_trimmed_length = working_directory + '/' + dataset_ID + '.raw_length_trimmed.fastq'
 fastq_trimmed_primers = working_directory + '/' + dataset_ID + '.raw_primers_trimmed.fastq'
 fastq_split_by_barcodes = working_directory + '/' + dataset_ID + '.raw_split_by_barcodes.fastq'
@@ -85,8 +87,8 @@ else:
 
 # Parallel steps:
 #       1. split fastq into chunks
-#       2. sort by barcodes, remove primers, and trim
-#       3. recombine into a single fastq before dereplicating
+#       2. sort by barcodes, remove primers, and trim, and convert to fasta format
+#       3. recombine into a single fasta file before dereplicating
 
 # Step 1.1 - split file into 200000 line chunks
 os.chdir(working_directory)
@@ -114,65 +116,120 @@ output = mp.Queue()
 # Step 2.1 - split by barcodes
 if (options.split_by_barcodes == 'False'):
     mode = summary_obj.attribute_value_16S['BARCODES_MODE']
-    barcode_processes = [mp.Process(target=OTU.split_by_barcodes, args=(split_filename, split_filename + '.split_by_barcodes', barcodes_map, mode)) for split_filename in split_filenames]
+    barcode_processes = [mp.Process(target=OTU.split_by_barcodes, args=(split_filename, split_filename + '.sb', barcodes_map, mode)) for split_filename in split_filenames]
     for p in barcode_processes:
         p.start()
     for p in barcode_processes:
         p.join()
-    split_filenames = [f + '.split_by_barcodes' for f in split_filenames] 
+    split_filenames = [f + '.sb' for f in split_filenames] 
+
 
 # Step 2.2 - remove primers
 if (options.primers_removed == 'False'):
     # Remove primers
-    primer_processes = [mp.Process(target=OTU.remove_primers, args=(split_filename, split_filename + '.primers_trimmed', primers_file)) for split_filename in split_filenames]
+    primer_processes = [mp.Process(target=OTU.remove_primers, args=(split_filename, split_filename + '.pt', primers_file)) for split_filename in split_filenames]
     for p in primer_processes:
         p.start()
     for p in primer_processes:
         p.join()
-    split_filenames = [f + '.primers_trimmed' for f in split_filenames] 
+    split_filenames = [f + '.pt' for f in split_filenames] 
 
 
-"""
+
 # Step 2.3 - trim with quality filter
-quality_trim_processes = [mp.Process(target=OTU.trim_quality, args=(split_filename, split_filename + '.quality_trimmed', ascii_encoding)) for split_filename in split_filenames]
+quality_trim_processes = [mp.Process(target=OTU.trim_quality, args=(split_filename, split_filename + '.qt', ascii_encoding)) for split_filename in split_filenames]
 for p in quality_trim_processes:
     p.start()
 for p in quality_trim_processes:
     p.join()
-split_filenames = [f + '.quality_trimmed' for f in split_filenames] 
-"""
+split_filenames = [f + '.qt' for f in split_filenames] 
+
 
 # Step 2.4 - trim to uniform length of 101
 length = 101
-length_trim_processes = [mp.Process(target=OTU.trim_length, args=(split_filename, split_filename + '.length_trimmed', length, ascii_encoding)) for split_filename in split_filenames]
+length_trim_processes = [mp.Process(target=OTU.trim_length, args=(split_filename, split_filename + '.lt', length, ascii_encoding)) for split_filename in split_filenames]
 for p in length_trim_processes:
     p.start()
 for p in length_trim_processes:
     p.join()
-split_filenames = [f + '.length_trimmed' for f in split_filenames] 
+split_filenames = [f + '.lt' for f in split_filenames] 
 
-# Step 3 - Recombine into a single fastq file
+# Step 2.5 - convert to FASTA format
+fasta_conversion_processes = [mp.Process(target=frmt.fastq2fasta, args=(split_filename, split_filename + '.fasta')) for split_filename in split_filenames]
+for p in fasta_conversion_processes:
+    p.start()
+for p in fasta_conversion_processes:
+    p.join()
+split_filenames = [f + '.fasta' for f in split_filenames] 
+
+
+# Step 3 - Recombine into a single fasta file
 if len(split_filenames)>1:
     cat_str = ['cat']
     for filename in split_filenames:
         cat_str.append(filename)
     cat_str = ' '.join(cat_str)
-    cat_str = cat_str + ' > ' + fastq_trimmed_length
+    cat_str = cat_str + ' > ' + fasta_trimmed
+    #cat_str = cat_str + ' > ' + fastq_trimmed_length
+    
     # Recombine
     os.system(cat_str)
-    
+
+
 # Dereplicate and sort by size
 try:
     separator = summary_obj.attribute_value_16S['BARCODES_SEPARATOR']
 except:
-    separator = ';'
-OTU.dereplicate_and_sort(fastq_trimmed_length, fasta_dereplicated, OTU_database, separator)
+    separator = '_'
+OTU.dereplicate_and_sort(fasta_trimmed, fasta_dereplicated, OTU_database, separator)
+
 
 # Remove chimeras
 OTU.remove_chimeras_and_cluster_OTUs(fasta_dereplicated, OTU_sequences_fasta, OTU_sequences_table, OTU_clustering_results)
 
-# Build OTU table
-OTU.build_OTU_table(OTU_sequences_fasta, OTU_table, OTU_database)
+
+################
+#
+# Obtain Greengenes reference IDs for dereplicated sequences
+#
+################
+
+alignment_results = working_directory + '/gg_alignments.aln'
+cmd_str = 'usearch8 -usearch_local ' + OTU_sequences_fasta + ' -db /home/ubuntu/gg_13_5_otus/rep_set/97_otus.fasta -strand both -id 0.97 -alnout ' + alignment_results
+os.system(cmd_str)
+
+
+# Extract alignment dictionary
+OTU_GG_dict = OTU.parse_alignment(alignment_results)
+
+# Build 2 OTU tables - one complete, one only with OTUs that matched a Greengene sequence (for use in PiCRUST) 
+OTU.build_OTU_table(OTU_sequences_fasta, OTU_database, OTU_table, OTU_GG_dict)
+
+# Convert OTU tables to classic format
+OTU_table_classic = OTU_table + '.classic'
+OTU_table_gg = OTU_table + '.gg'
+OTU_table_gg_classic = OTU_table_gg + '.classic'
+frmt.convert_OTU_to_classic_dense_format(OTU_table, OTU_table_classic)
+frmt.convert_OTU_to_classic_dense_format(OTU_table_gg, OTU_table_gg_classic)
+
+# Convert to BIOM format
+#OTU_table_biom = working_directory + '/' + dataset_ID + '.biom'
+#OTU_table_biom_gg = working_directory + '/' + dataset_ID + '.gg.biom'
+#frmt.build_OTU_table_biom(OTU_table + '.classic', OTU_table_biom, dataset_ID)
+#frmt.build_OTU_table_biom(OTU_table + '.gg.classic', OTU_table_biom_gg, dataset_ID)
+
+# Transfer to QIIME server for PiCRUST
+cmd_str = 'scp -i /home/ubuntu/kys/ec2_private_key.pem ' + OTU_table_gg_classic + ' ubuntu@52.4.197.174:/home/ubuntu/picrust_inbox/.'
+os.system(cmd_str)
+
+
+
+###################
+#
+#  Final check
+#
+###################
+
 
 # Check for file size greater than zero - add more thorough check eventually
 otu_proc_success = False
