@@ -1,0 +1,102 @@
+\documentclass[11pt, oneside]{article}   	% use "amsart" instead of "article" for AMSLaTeX format
+\usepackage{geometry}                		% See geometry.pdf to learn the layout options. There are lots.
+\geometry{letterpaper}                   		% ... or a4paper or a5paper or ... 
+%\geometry{landscape}                		% Activate for for rotated page geometry
+%\usepackage[parfill]{parskip}    		% Activate to begin paragraphs with an empty line rather than an indent
+\usepackage{graphicx}				% Use pdf, png, jpg, or eps§ with pdflatex; use eps in DVI mode
+								% TeX will automatically convert eps --> pdf in pdflatex		
+\usepackage{amssymb}
+
+\title{16S processing on AWS}
+%\author{}
+\date{}							% Activate to display a given date or no date
+
+\begin{document}
+\maketitle
+\section{Introduction}
+This document describes the process of going from raw 16S data on in an S3 bucket to processed data.  Each dataset must be accompanied by a machine-readable text file, called a summary file, described below. 
+
+\section{Preliminary notes - read this first!!}
+\subsection{Raw FASTQ files}
+The 16S pipeline is designed to take individual FASTQ files.  If you have many files for a single dataset, merge them into a single file.  The pipeline will split them for parallelization and recombine them for OTU calling.
+
+FASTQ files have different ASCII encodings for the quality characters.  It is often ASCII base 33 or ASCII base 64.  Check this using {\tt usearch -fastq\_chars yourFASTQfile.fastq} and specify the encoding in the summary file.  If left unspecified, it will default to base 64, which could cause problems.
+
+\subsection{Summary files}
+This file, named {\tt summary\_file.txt}, is a machine-readable, \textbf{tab-delimited} file that must accompany any dataset directory when uploaded to the cloud.  It should be found in the highest directory level for the dataset directory in the S3 bucket.  It is a text file with descriptors for the data and paths to all relevant datafiles within the directory.  It can include a True or False flag for whether any associated raw 16S data has already been processed.  
+
+The order in which items are listed between the lines {\tt \#16S\_start} and {\tt \#16S\_end} appear does not matter.  For an exhaustive list of summary file attributes, see the table below.
+
+\subsection{Metadata}
+Metadata is uploaded as is to S3 for storage with the raw data.  Ideally, we want to capture as much of the metadata as possible in the database and into file objects describing the data (e.g. OTU tables in BIOM format).  We can produce a file with three columns: {\tt sample\_ID}, {\tt disease\_label} and {\tt keywords}.  {\tt sample\_ID} corresponds to the name ID of the sample as is listed in the OTU table.  {\tt disease\_label} is a specific label used for each subject and can be more general than disease, but is used by the analytics layer for building classifiers and such.  There is a list on the Personal Analytics AWS Google drive describing these labels.  {\tt keywords} can be a list of any keywords you think should be associated with the sample.  These are listed separated by commas and no spaces (e.g. {\tt keyword1,keyword2,keyword3}).  These will be searchable from the database interface so it's worth giving them some thought!
+
+\subsection{Dataset master list}
+Once a dataset is uploaded, please add an entry on the master list on the PA google drive.
+
+\section{Examples}
+\subsection{Case 1: raw FASTQ file, still includes primers and barcodes}
+The simplest case is if you have the following files: a raw FASTQ file; a file specifying the map between barcode sequences and IDs; and a file specifying the primers used.  Your summary file would look something like this:
+
+\begin{verbatim}
+DATASET_ID	myDataset
+
+#16S_start
+RAW_FASTQ_FILE		myData.fastq
+ASCII_ENCODING		ASCII_BASE_33
+PRIMERS_FILE		primers.txt
+BARCODES_MAP		barcodes_map.txt
+BARCODES_MODE		2
+METADATA_FILE		metadata.txt
+PROCESSED		False
+#16S_end
+\end{verbatim}
+Note that you must also specify the place where barcodes are to be found, i.e. either in the ">" sequence ID lines (mode 1) or in the sequences themselves (mode 2).  The {\tt PROCESSED} flag tells the processing instance that the dataset needs to be processed into OTU tables.
+
+\subsection{Case 2: raw FASTQ file, primers and barcodes have been removed}
+In the case where the 'raw' data has actually had primers and barcodes previously removed, the sample IDs must be listed in the sequence ID lines of the FASTQ file.  When the pipeline removes barcodes itself and replaces them with sample IDs, individual sequence reads for a given {\tt sampleID} will be annotated as {\tt sampleID;1, sampleID;2}, etc., where we note here that the {\tt BARCODES\_SEPARATOR} is ';'.  However, in a dataset where the barcodes have previously been removed, you will have to look into the FASTQ file to check the 'separator' character.  Your summary file would look something like this:
+
+\begin{verbatim}
+DATASET_ID	myDataset
+
+#16S_start
+RAW_FASTQ_FILE	myData.fastq
+ASCII_ENCODING	ASCII_BASE_33
+PRIMERS_FILE	None
+BARCODES_MAP	None
+BARCODES_SEPARATOR	;
+METADATA_FILE	metadata.txt
+PROCESSED	False
+#16S_end
+\end{verbatim}
+		
+		
+\subsection{Case 3: no raw data, only OTU table}		
+If you wanted to upload an OTU table without any associated raw data, your summary file would look something like this:
+\begin{verbatim}
+DATASET_ID	myDataset
+
+#16S_start
+OTU_TABLE	otu_table.txt
+OTU_SEQUENCES_FASTA	otu_sequences.fasta
+METADATA_FILE	metadata.txt
+PROCESSED	True
+#16S_end
+\end{verbatim}
+
+%\subsection{}
+
+\section{Python modules}
+\subsection{Modules}
+\begin{itemize}
+  \item {\tt Formatting.py} - Module to house miscellaneous formatting methods, e.g. conversion from classic dense format to BIOM format, OTU table transposition, etc.
+	\item {\tt DepositDB.py} - Methods for depositing data into the database.
+	\item {\tt preprocessing\_16S.py} - Methods and wrappers for raw 16S sequence data processing.
+\end{itemize}
+
+\subsection{Scripts}
+\begin{itemize}
+	\item {\tt Master.py} - Master script that calls relevant processing pipelines, e.g. {\tt raw2otu.py}.
+	\item {\tt raw2otu.py} - Pipeline for converting raw 16S FASTQ sequence files to OTU tables.  Handles parallelization requirements in these processing steps automatically.  Takes as input a directory that contains a summary file and the raw data.
+\end{itemize}
+
+\end{document}  
