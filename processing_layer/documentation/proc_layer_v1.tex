@@ -50,7 +50,7 @@ METADATA_FILE		metadata.txt
 PROCESSED		False
 #16S_end
 \end{verbatim}
-Note that you must also specify the place where barcodes are to be found, i.e. either in the ">" sequence ID lines (mode 1) or in the sequences themselves (mode 2).  The {\tt PROCESSED} flag tells the processing instance that the dataset needs to be processed into OTU tables.
+Note that you must also specify the place where barcodes are to be found, i.e. either in the "$>$" sequence ID lines (mode 1) or in the sequences themselves (mode 2).  The {\tt PROCESSED} flag tells the processing instance that the dataset needs to be processed into OTU tables.
 
 \subsection{Case 2: raw FASTQ file, primers and barcodes have been removed}
 In the case where the 'raw' data has actually had primers and barcodes previously removed, the sample IDs must be listed in the sequence ID lines of the FASTQ file.  When the pipeline removes barcodes itself and replaces them with sample IDs, individual sequence reads for a given {\tt sampleID} will be annotated as {\tt sampleID;1, sampleID;2}, etc., where we note here that the {\tt BARCODES\_SEPARATOR} is ';'.  However, in a dataset where the barcodes have previously been removed, you will have to look into the FASTQ file to check the 'separator' character.  Your summary file would look something like this:
