@@ -29,8 +29,8 @@ if( not options.datadir ):
 
 # Pipe stdout and stderr to logfiles in the new directory
 working_directory = options.datadir
-sys.stdout = open(os.path.join(working_directory, 'stdout_master.log'),'w')
-sys.stderr = open(os.path.join(working_directory, 'stderr_master.log'),'w')
+sys.stdout = open(os.path.join(working_directory, '/stdout_master.log','w'))
+sys.stderr = open(os.path.join(working_directory, '/stderr_master.log','w'))
 
 # Parse summary file
 summary_filename = os.path.join(options.datadir, 'summary_file.txt')

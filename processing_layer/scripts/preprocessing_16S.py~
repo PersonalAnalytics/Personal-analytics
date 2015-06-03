@@ -77,13 +77,8 @@ def trim_quality((fastq_in, fastq_out, ascii_encoding)):
         print "[[ Quality trimming ]] Complete."
         return None
 
-def trim_length_fasta((fasta_in, fasta_out, length)):
-    # Trims FASTA files to uniform length
-    str1 = '/home/ubuntu/bin/usearch8 -fastx_truncate ' + fasta_in + ' -trunclen ' + str(length) + ' -fastaout ' + fasta_out
-    os.system(str1)
-
-def trim_length_fastq((fastq_in, fastq_out, length, ascii_encoding)):
-    # Trims FASTQ files to usearch -fastq_chars obio.raw.fsq uniform length and filters by maximum expected error
+def trim_length((fastq_in, fastq_out, length, ascii_encoding)):
+    # Trims to uniform length and filters by maximum expected error
     # Takes as input the ascii encoding (33 or 64 currently supported)
     str1 = '/home/ubuntu/bin/usearch8 -fastq_filter ' + fastq_in + ' -fastq_trunclen ' + str(length) + ' -fastq_maxee 0.25 -fastq_ascii ' + str(ascii_encoding) + ' -fastqout ' + fastq_out
     os.system(str1)

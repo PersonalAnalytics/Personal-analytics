@@ -200,7 +200,7 @@ if (raw_file_type == "FASTQ"):
     pool.join()
     split_filenames = [f + '.lt' for f in split_filenames] 
 else:
-    pool.map(OTU.trim_length_fasta, zip(filenames, newfilenames, length_vect))
+    pool.map(OTU.trim_length_fasta, zip(filenames, newfilenames, length_vect, ascii_vect))
     pool.close()
     pool.join()
     split_filenames = [f + '.lt' for f in split_filenames] 

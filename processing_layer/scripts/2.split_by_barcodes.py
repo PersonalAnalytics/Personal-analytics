@@ -45,6 +45,8 @@ def parse_barcodes_file(map_fn, format='fasta', rc=False):
             b2s[b] = s
     # Case 2: barcodes file is tab-delimited
     elif format == 'tab':
+        with open(map_fn) as fid:
+            all_lines = fid.readlines()
         for line in open(map_fn):
             [s,b] = line.rstrip().split()
             if rc == True:
@@ -121,7 +123,7 @@ def run():
     args = parse_args()
     b2s = parse_barcodes_file(args.b, format=args.B, rc=args.rc) # barcodes to samples
     s2b = parse_index_file(args.i, format=args.I) # samples to barcodes
-    s2c = {} # samples to counts
+    s2c = {} # count number for a given sample
     out = open(args.o, 'w')
     
     # Get FASTA, FASTQ filenames and iterators

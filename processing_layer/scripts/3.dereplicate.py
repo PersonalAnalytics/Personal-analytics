@@ -31,12 +31,13 @@ def dereplicate(fst='', fsq='', sep='', trim_len=''):
         fn = fsq
         iter_fst = util.iter_fsq
 
-    counter = 0
     for record in iter_fst(fn):
         [sid, seq] = record[:2]
         sid = sid[1:]
         #sa = re.search('(.*?)%s' %(sep), sid).group(1)
-        sa = sid.split(sep)[0]
+#        sa = sid.split(sep)[0]
+        sa = sid.split(sep)
+        sa = sep.join(sa[:len(sa)-1])
         if trim_len:
             if len(seq) >= trim_len:
                 seq = seq[:trim_len]
